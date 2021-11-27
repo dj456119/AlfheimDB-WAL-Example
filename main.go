@@ -4,7 +4,7 @@
  * @Author: cm.d
  * @Date: 2021-11-20 11:50:21
  * @LastEditors: cm.d
- * @LastEditTime: 2021-11-26 21:13:08
+ * @LastEditTime: 2021-11-27 12:12:09
  */
 
 package main
@@ -14,6 +14,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	alfheimdbwal "github.com/dj456119/AlfheimDB-WAL"
@@ -133,7 +134,12 @@ func Init(aw *alfheimdbwal.AlfheimDBWAL) {
 }
 
 func main() {
-	wal := alfheimdbwal.NewWAL("data/")
-	Init(wal)
+	wal := alfheimdbwal.AlfheimDBWAL{}
+	wal.Dirname = "data/"
+	wal.MaxItems = 1000
+	wal.IsBigEndian = true
+	wal.Mutex = new(sync.Mutex)
+	wal.BuildDirIndex()
+	Init(&wal)
 
 }

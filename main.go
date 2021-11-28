@@ -4,7 +4,7 @@
  * @Author: cm.d
  * @Date: 2021-11-20 11:50:21
  * @LastEditors: cm.d
- * @LastEditTime: 2021-11-27 12:12:09
+ * @LastEditTime: 2021-11-29 01:00:16
  */
 
 package main
@@ -24,6 +24,12 @@ import (
 var index int64
 var wal *alfheimdbwal.AlfheimDBWAL
 
+const (
+	LengthBytesLength = 1 << 3
+	PosBytesLength    = 1 << 3
+	HeaderBytesLength = LengthBytesLength + PosBytesLength
+)
+
 //curl "http://localhost:12345/single?data=hahaha"
 func SingeWrite(w http.ResponseWriter, req *http.Request) {
 	req.ParseForm()
@@ -31,7 +37,7 @@ func SingeWrite(w http.ResponseWriter, req *http.Request) {
 
 	logrus.Info("Request data is ", v)
 	t1 := time.Now().UnixNano() / 1e6
-	buff := make([]byte, 8+8+len(v))
+	buff := make([]byte, HeaderBytesLength+len(v))
 	lItem := alfheimdbwal.NewLogItemBuff(index, []byte(v), buff, true)
 	wal.WriteLog(lItem, buff)
 	t2 := time.Now().UnixNano() / 1e6
@@ -46,13 +52,13 @@ func BatchWrite(w http.ResponseWriter, req *http.Request) {
 	v := req.Form.Get("data")
 	logrus.Info("Request data is ", v)
 	batchCount, _ := strconv.ParseInt(req.Form.Get("count"), 10, 32)
-	buff := make([]byte, len(v)*int(batchCount)+16*int(batchCount))
+	buff := make([]byte, len(v)*int(batchCount)+HeaderBytesLength*int(batchCount))
 	lists := []*alfheimdbwal.LogItem{}
 	pos := 0
 	for i := 0; i < int(batchCount); i++ {
 		lists = append(lists, alfheimdbwal.NewLogItemBuff(index, []byte(v), buff[pos:], true))
 		index++
-		pos = pos + 16 + len(v)
+		pos = pos + HeaderBytesLength + len(v)
 	}
 	t1 := time.Now().UnixNano() / 1e6
 	wal.BatchWriteLog(lists, buff)
@@ -87,7 +93,7 @@ func Benchmarks(w http.ResponseWriter, req *http.Request) {
 		data[i] = 'a'
 	}
 	t1 := time.Now().UnixNano() / 1e6
-	buff := make([]byte, perLength*batchCount+batchCount*16)
+	buff := make([]byte, perLength*batchCount+batchCount*HeaderBytesLength)
 	for x := 0; x < int(loop); x++ {
 
 		lists := make([]*alfheimdbwal.LogItem, batchCount)
@@ -95,7 +101,7 @@ func Benchmarks(w http.ResponseWriter, req *http.Request) {
 		for i := 0; i < int(batchCount); i++ {
 			lists = append(lists, alfheimdbwal.NewLogItemBuff(index, data, buff[pos:], true))
 			index++
-			pos = pos + 16 + int(perLength)
+			pos = pos + HeaderBytesLength + int(perLength)
 		}
 		t3 := time.Now().UnixNano() / 1e6
 		wal.BatchWriteLog(lists, buff)
